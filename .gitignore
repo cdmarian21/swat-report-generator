@@ -1,0 +1,13 @@
+# sensitive data ignored, but the gitkeep is there to ensure the folder exists
+data/*
+!data/.gitkeep
+
+output/
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+.env
+*.env
