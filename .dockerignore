@@ -1,0 +1,16 @@
+# sensitive/local-only.
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# datasets/output
+data/
+output/
+
+# docs/meta
+*.md
+.gitignore
+.dockerignore
