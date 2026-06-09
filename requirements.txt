@@ -1,0 +1,3 @@
+# runtime dependencies for reproduction and scannable builds
+# SBOM will document the full set
+pandas==3.0.3
