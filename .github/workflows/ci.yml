@@ -1,0 +1,39 @@
+name: CI
+
+# security scans on every push and PR targeting main, so nothing reaches
+# main without passing SAST (Bandit) and dependency audit (pip-audit).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# this workflow only reads, priveleges to enforce this
+permissions:
+  contents: read
+
+jobs:
+  sast-and-sca:
+    name: SAST + dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install security tools
+        run: pip install bandit pip-audit
+
+      # scanning our sources for insecure Python patterns
+      # Bandit exits non-zero on a high severity
+      - name: Bandit (SAST)
+        run: bandit -r src --severity-level high
+
+      # auditing the dependencies against known vulnerability data.
+      # pip-audit exits non-zero if any dependency has one
+      - name: pip-audit (dependency scan)
+        run: pip-audit -r requirements.txt
