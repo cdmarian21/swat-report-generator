@@ -1,0 +1,55 @@
+name: Deploy
+
+# deploying on a vtag (v1.0.0) (not the automatic build that runs on every merge to main)
+on:
+  push:
+    tags: ["v*.*.*"]
+
+#   packages: read = pull the image
+#   pages: write = publish to Pages
+#   id-token: write = OIDC token to authenticate
+#   contents: read = default checkout access
+permissions:
+  contents: read
+  packages: read
+  pages: write
+  id-token: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  deploy:
+    name: Generate report and publish to Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the published image
+        run: docker pull "$IMAGE:latest"
+
+      # run the container to build the report, then copy the
+      # HTML out as index.html so Pages serves it at the site root
+      - name: Generate report from container
+        run: |
+          mkdir -p site
+          docker run --name swat "$IMAGE:latest"
+          docker cp swat:/app/output/report.html site/index.html
+          docker rm swat
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
