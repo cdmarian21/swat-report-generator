@@ -1,0 +1,63 @@
+name: Build
+
+# build -> scan -> SBOM -> push
+on:
+  push:
+    branches: [main]
+
+# only read and write packages privelges explicitly enabled 
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # GHCR image name
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-scan-push:
+    name: Build, scan, SBOM, push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build image (multi-stage)
+        run: docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+
+      # container scan = fail the build on only the fixable high/critical CVEs only:
+      # --ignore-unfixed for the ones that cannot be fixed
+      # Runs before any push
+      - name: Trivy image scan
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            --scanners vuln --ignore-unfixed \
+            --severity HIGH,CRITICAL --exit-code 1 \
+            "$IMAGE:${{ github.sha }}"
+
+      # SBOM to enumerate everything in the image for supply-chain regulation
+      - name: Generate SBOM (Syft)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/out" anchore/syft:latest \
+            "$IMAGE:${{ github.sha }}" -o spdx-json=/out/sbom.spdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
+
+      # authenticate and publish to GHCR (dependant on all other steps being green)
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image to GHCR
+        run: |
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"

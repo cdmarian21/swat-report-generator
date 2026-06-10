@@ -24,8 +24,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-# run as an unprivileged user
-RUN useradd --create-home --uid 10001 appuser
+# Patch OS packages to pull in available security fixes (e.g. openssl, gnutls),
+# then create an unprivileged user. Done in one layer; apt lists removed after.
+RUN apt-get update && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 appuser
 WORKDIR /app
 
 # prebuilt venv/application
