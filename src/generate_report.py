@@ -32,7 +32,10 @@ CATEGORY_ORDER = [SENSOR_SPOOFING, VALVE_MANIPULATION, PUMP_OVERRIDE]
 
 
 def load_data(path):
-    df = pd.read_csv(path)
+    # low_memory=False reads each column in one pass so dtype inference is
+    # consistent. Without it, pandas infers types per chunk and a column with a
+    # few stray values can come back as mixed text, breaking numeric stats.
+    df = pd.read_csv(path, low_memory=False)
     if TIMESTAMP_COL not in df.columns:
         raise SystemExit(f"Input CSV is missing the '{TIMESTAMP_COL}' column: {path}")
     # Flexible parse so the same code handles the mock and the real file even if
@@ -53,15 +56,23 @@ def attack_frame(df, attack):
 
 
 def summarize_target(base_df, window_df, col):
-    b_mean = base_df[col].mean()
-    w_mean = window_df[col].mean()
-    delta_pct = (w_mean - b_mean) / b_mean * 100.0 if b_mean != 0 else float("nan")
+    # Coerce to numeric: real historian data has occasional non-numeric cells in
+    # otherwise-numeric columns. errors="coerce" turns those into NaN, which the
+    # mean/min/max then skip, instead of crashing on a string column.
+    base = pd.to_numeric(base_df[col], errors="coerce")
+    window = pd.to_numeric(window_df[col], errors="coerce")
+    b_mean = base.mean()
+    w_mean = window.mean()
+    if pd.notna(b_mean) and b_mean != 0:
+        delta_pct = (w_mean - b_mean) / b_mean * 100.0
+    else:
+        delta_pct = float("nan")
     return {
         "column": col,
         "baseline_mean": b_mean,
         "window_mean": w_mean,
-        "window_min": window_df[col].min(),
-        "window_max": window_df[col].max(),
+        "window_min": window.min(),
+        "window_max": window.max(),
         "delta_pct": delta_pct,
     }
 
