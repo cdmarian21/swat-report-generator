@@ -150,17 +150,6 @@ Workflow permissions: blocks limit what each run can do, but the *enforcement* t
 - **Secret scanning + push protection** — GitHub-native, to catch committed credentials before they land.
 - **Environment + package scoping** — the github-pages environment is restricted to release tags, and the GHCR package is published for distribution.
 
-## Looking Ahead
-
-Deliberately deferred to keep this exercise small.
-Each would ideally be a priority for a production version:
-
-- **Cosign keyless signing (Sigstore)** — cryptographically sign the image so users can verify it came from this pipeline and wasn't altered with.
-- **SBOM attestation attached to the image** — bind the SBOM to the image as a signed attestation (not just a build artifact), so the bill of materials travels with the artifact and is verifiable at pull time.
-- **Digest-pin remaining supply-chain inputs** — pin third party Actions to unchangeable commit SHAs and the Docker base image to its sha256 digest, removing the risk of a changeable tag silently changing what runs. (The Trivy and Syft scanner images are already pinned to fixed versions, and Dependabot keeps all of these current).
-- **Manual approval gate on deploy** — require human approval on the github pages env before a release publishes.
-- **CodeQL with Bandit** — to catch semantic issues that pattern based scanning misses (this would be layered on top of Bandit).
-- **Hash-pinned dependencies** — add pip install --require-hashes with a fully hashed lock file to block dependency sub.
 
 ## Attribution
 
