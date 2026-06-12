@@ -19,9 +19,9 @@ For each labeled attack it shows:
 - an **attack-type category** — *Sensor Spoofing*, *Valve Manipulation*, or *Pump Override*, and
 - **behavior during the attack window vs. the normal baseline** (mean, min, max, and percent deviation, with significant anomalies or deviations flagged).
 
-**About the dataset:** SWaT (Secure Water Treatment) is an ICS testbed created by iTrust, SUTD. This dataset (`SWaT.A12`, Mar 2026) is an 8-hour run sampled once per second with 28,861 rows × 87 columns detailing the six water treatment process stages (P1–P6). The first 4 hours are normal operation, and the second 4 hours contain **11 labeled cyberattacks** with known timestamps and targets. Each column name encodes its type: `.Pv` = sensor reading, `.Status` = actuator state, `.Speed` = pump speed, `_STATE` = process state, `.Alarm` = alarm state.
+**About the dataset:** SWaT (Secure Water Treatment) is an ICS testbed created by iTrust, SUTD. This dataset (SWaT.A12, Mar 2026) is an 8-hour run sampled once per second with 28,861 rows × 87 columns detailing the six water treatment process stages (P1–P6). The first 4 hours are normal operation, and the second 4 hours contain **11 labeled cyberattacks** with known timestamps and targets. Each column name encodes its type: .Pv = sensor reading, .Status = actuator state, .Speed = pump speed, _STATE = process state, .Alarm = alarm state.
 
-**Why the real dataset isn't in this repo:** The full CSV is sensitive operational ICS data, licensed by iTrust, and too large for source control. Committing it to a public repo would breach the license and leak operational data. Instead, a seeded mock-data generator produces a mock data in the form of a CSV for CI and the public demo, while the real file is swapped in locally (see [Instructions to Run](#instructions-to-run)). The `.gitignore` enforces this, so the dataset can never be committed by accident.
+**Why the real dataset isn't in this repo:** The full CSV is sensitive operational ICS data, licensed by iTrust, and too large for source control. Committing it to a public repo would breach the license and leak operational data. Instead, a seeded mock-data generator produces a mock data in the form of a CSV for CI and the public demo, while the real file is swapped in locally (see [Instructions to Run](#instructions-to-run)). The .gitignore enforces this, so the dataset can never be committed by accident.
 
 ## Repository Layout
 
@@ -55,8 +55,9 @@ Workflow steps: test (on every change) -> build a scanned artifact (on merge) ->
 | Step | Why it exists |
 |------|---------------|
 | Checkout + set up Python 3.12 | Exists to prepare the runner |
-| `bandit -r src --severity-level high` | catches insecure Python source code and fails the job on a high severity faults (SAST) |
-| `pip-audit -r requirements.txt` | fails the job if a dependency has a known vulnerability (SCA) |
+| pytest | runs unit + smoke tests so a broken app fails CI, not only insecure code |
+| bandit -r src --severity-level high | catches insecure Python source code and fails the job on a high severity faults (SAST) |
+| pip-audit -r requirements.txt | fails the job if a dependency has a known vulnerability (SCA) |
 
 Nothing reaches main without passing both states.
 
@@ -66,7 +67,7 @@ Nothing reaches main without passing both states.
 
 | Step | Why it exists |
 |------|---------------|
-| `docker build` (multi-stage) | Produces the runtime image |
+| docker build (multi-stage) | Produces the runtime image |
 | **Trivy** image scan | Scans the image + OS for CVEs; fails the build on any fixable high/critical faults |
 | **Syft** SBOM | Generates an SPDX SBOM documenting all components (build artifact) |
 | Log in + push to **GHCR** | Publishes the image (tagged with the commit SHA and latest) |
@@ -79,11 +80,11 @@ The scan runs before the push, so a failing scan means nothing is published to G
 
 | Step | Why it exists |
 |------|---------------|
-| Log in + pull image from GHCR | Retrieve the published artifact |
+| Log in + pull image from GHCR (by commit SHA) | Retrieve the exact image built for this release commit |
 | Run the container | The container's default command generates the report |
 | Copy, Upload, Deploy | Publishes the HTML to GitHub Pages |
 
-id-token: write lets the Pages deployment authenticate via OIDC, and deployment to the github-pages is dependendant on release tags.
+The image is pulled by commit SHA (not latest), so a release deploys exactly the artifact built for that commit. id-token: write lets the Pages deployment authenticate via OIDC, and deployment to the github-pages environment is restricted to release tags.
 
 ## Instructions to Run
 
@@ -140,6 +141,15 @@ Each tool was specifically chosen for this context:
 - **Trivy gates on *fixable* HIGH/CRITICAL only (--ignore-unfixed).** Slim base images carry some CVEs with no inherent fix; failing on those would make the control permanently red and meaningless. So, we instead patch the base image at build time (apt-get upgrade) and fail only on vulnerabilities we can act on.
 - **Reproducible/minimal images.** The Dockerfile is multi-stage (build tooling never ships), runs as a **non-root user**, uses a pinned slim base, and the sole Python dependency is exact-pinned for reproducible, scannable builds.
 
+## Repository Security Settings
+
+Workflow permissions: blocks limit what each run can do, but the *enforcement* that nothing reaches main without passing CI comes from repository settings. This repo uses:
+
+- **Branch protection on main** — require a pull request, require the **CI** status check to pass before merging, and block direct pushes. Because build.yml triggers on merge to main, requiring CI before merge means only CI-passed code is ever built or deployed.
+- **Restricted release tags** — limit who can create `v*.*.*` tags, since a tag is what triggers a deploy.
+- **Secret scanning + push protection** — GitHub-native, to catch committed credentials before they land.
+- **Environment + package scoping** — the github-pages environment is restricted to release tags, and the GHCR package is published for distribution.
+
 ## Looking Ahead
 
 Deliberately deferred to keep this exercise small.
@@ -147,9 +157,10 @@ Each would ideally be a priority for a production version:
 
 - **Cosign keyless signing (Sigstore)** — cryptographically sign the image so users can verify it came from this pipeline and wasn't altered with.
 - **SBOM attestation attached to the image** — bind the SBOM to the image as a signed attestation (not just a build artifact), so the bill of materials travels with the artifact and is verifiable at pull time.
-- **SHA-pinned actions** — pin third-party actions to immutable commit SHAs instead of mutable version tags, removing the risk of a compromised tag silently changing what runs. (Dependabot is already configured to keep such pins current)
+- **Digest-pin remaining supply-chain inputs** — pin third party Actions to unchangeable commit SHAs and the Docker base image to its sha256 digest, removing the risk of a changeable tag silently changing what runs. (The Trivy and Syft scanner images are already pinned to fixed versions, and Dependabot keeps all of these current).
 - **Manual approval gate on deploy** — require human approval on the github pages env before a release publishes.
 - **CodeQL with Bandit** — to catch semantic issues that pattern based scanning misses (this would be layered on top of Bandit).
+- **Hash-pinned dependencies** — add pip install --require-hashes with a fully hashed lock file to block dependency sub.
 
 ## Attribution
 
