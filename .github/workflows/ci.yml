@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [main]
 
-# this workflow only reads, priveleges to enforce this
+# this workflow only reads; least-privilege permissions enforce that
 permissions:
   contents: read
 
@@ -25,8 +25,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install security tools
-        run: pip install bandit pip-audit
+      - name: Install dependencies and tools
+        run: pip install -r requirements.txt bandit pip-audit pytest
+
+      - name: Run tests
+        run: pytest -q
 
       # scanning our sources for insecure Python patterns
       # Bandit exits non-zero on a high severity
