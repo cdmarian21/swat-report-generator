@@ -31,7 +31,7 @@ jobs:
       - name: Trivy image scan
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:latest image \
+            aquasec/trivy:0.71.0 image \
             --scanners vuln --ignore-unfixed \
             --severity HIGH,CRITICAL --exit-code 1 \
             "$IMAGE:${{ github.sha }}"
@@ -40,7 +40,7 @@ jobs:
       - name: Generate SBOM (Syft)
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$PWD:/out" anchore/syft:latest \
+            -v "$PWD:/out" anchore/syft:v1.45.1 \
             "$IMAGE:${{ github.sha }}" -o spdx-json=/out/sbom.spdx.json
 
       - name: Upload SBOM artifact

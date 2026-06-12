@@ -34,14 +34,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull the published image
-        run: docker pull "$IMAGE:latest"
+        run: docker pull "$IMAGE:${{ github.sha }}"
 
       # run the container to build the report, then copy the
       # HTML out as index.html so Pages serves it at the site root
       - name: Generate report from container
         run: |
           mkdir -p site
-          docker run --name swat "$IMAGE:latest"
+          docker run --name swat "$IMAGE:${{ github.sha }}"
           docker cp swat:/app/output/report.html site/index.html
           docker rm swat
 

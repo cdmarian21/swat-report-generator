@@ -19,7 +19,7 @@ RUN pip install -r requirements.txt
 # Stage 2: runtime 
 FROM python:3.12-slim-bookworm AS runtime
 
-# cleaning container logs.
+# PYTHONDONTWRITEBYTECODE: don't write .pyc files; PYTHONUNBUFFERED: keep logs unbuffered.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
