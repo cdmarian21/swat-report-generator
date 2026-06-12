@@ -86,6 +86,17 @@ The scan runs before the push, so a failing scan means nothing is published to G
 
 The image is pulled by commit SHA (not latest), so a release deploys exactly the artifact built for that commit. id-token: write lets the Pages deployment authenticate via OIDC, and deployment to the github-pages environment is restricted to release tags.
 
+### Release Process
+
+Release tags are only ever created from commits already merged to main, so the SHA-tagged image the deploy pulls is guaranteed to exist:
+
+1. Open a PR and merge to main after CI passes.
+2. **Build** publishes ghcr.io/cdmarian21/swat-report-generator:<commit-sha> and updates :latest.
+3. Create a `v*.*.*` tag on that same commit.
+4. **Deploy** pulls that exact <commit-sha> image and publishes the report to GitHub Pages.
+
+:latest tracks the most recent successful main build — a convenience pointer for docker pull. Releases are always deployed by immutable commit SHA, never by :latest.
+
 ## Instructions to Run
 
 ### Locally (Python)
@@ -139,7 +150,7 @@ Each tool was specifically chosen for this context:
 
 **Two important decisions:**
 - **Trivy gates on *fixable* HIGH/CRITICAL only (--ignore-unfixed).** Slim base images carry some CVEs with no inherent fix; failing on those would make the control permanently red and meaningless. So, we instead patch the base image at build time (apt-get upgrade) and fail only on vulnerabilities we can act on.
-- **Reproducible/minimal images.** The Dockerfile is multi-stage (build tooling never ships), runs as a **non-root user**, uses a pinned slim base, and the sole Python dependency is exact-pinned for reproducible, scannable builds.
+- **Reproducible/minimal images.** The Dockerfile is multi-stage (build tooling never ships), runs as a **non-root user**, uses a tag-pinned slim base, and the sole Python dependency is exact-pinned for reproducible, scannable builds.
 
 ## Repository Security Settings
 
@@ -150,6 +161,17 @@ Workflow permissions: blocks limit what each run can do, but the *enforcement* t
 - **Secret scanning + push protection** — GitHub-native, to catch committed credentials before they land.
 - **Environment + package scoping** — the github-pages environment is restricted to release tags, and the GHCR package is published for distribution.
 
+## Possible Future Additions
+
+Deliberately deferred to keep this exercise small.
+Each would ideally be a priority for a production version:
+
+- **Cosign keyless signing (Sigstore)** — cryptographically sign the image so users can verify it came from this pipeline and wasn't altered with.
+- **SBOM attestation attached to the image** — bind the SBOM to the image as a signed attestation (not just a build artifact), so the bill of materials travels with the artifact and is verifiable at pull time.
+- **Digest-pin remaining supply-chain inputs** — pin third party Actions to unchangeable commit SHAs and the Docker base image to its sha256 digest, removing the risk of a changeable tag silently changing what runs. (The Trivy and Syft scanner images are already pinned to fixed versions, and Dependabot keeps all of these current).
+- **Manual approval gate on deploy** — require human approval on the github pages env before a release publishes.
+- **CodeQL with Bandit** — to catch semantic issues that pattern based scanning misses (this would be layered on top of Bandit).
+- **Hash-pinned dependencies** — add pip install --require-hashes with a fully hashed lock file to block dependency sub.
 
 ## Attribution
 
