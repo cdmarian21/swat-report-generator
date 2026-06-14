@@ -104,13 +104,20 @@ Release tags are only ever created from commits already merged to main, so the S
 ```bash
 git clone https://github.com/cdmarian21/swat-report-generator.git
 cd swat-report-generator
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+```
 
-# Generate mock data, then the report:
+Create and activate a virtual environment:
+
+- **macOS / Linux:** `python3 -m venv .venv && source .venv/bin/activate`
+- **Windows (PowerShell):** `python -m venv .venv` then `.venv\Scripts\Activate.ps1` (or in CMD: `.venv\Scripts\activate.bat`)
+
+Then install dependencies and generate the report (identical on every platform):
+
+```bash
+pip install -r requirements.txt
 python src/generate_mock_data.py --output data/mock_swat.csv --seed 42
 python src/generate_report.py --input data/mock_swat.csv --output output/report.html
-# open output/report.html in a browser
+# then open output/report.html in a browser
 ```
 
 ### With Docker

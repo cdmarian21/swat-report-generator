@@ -139,7 +139,9 @@ def main():
     inject_attacks(df, ts_index, rng)
 
     # Match the real file's timestamp style (M/D/YYYY H:MM:SS, 24-hour).
-    df.insert(0, TIMESTAMP_COL, ts_index.strftime("%-m/%-d/%Y %H:%M:%S"))
+    # %m/%d (zero-padded) keeps strftime cross-platform; %-m/%-d raises on
+    # Windows. The report parses both padded and unpadded date forms.
+    df.insert(0, TIMESTAMP_COL, ts_index.strftime("%m/%d/%Y %H:%M:%S"))
     df = df[COLUMNS]  # enforce canonical column order
 
     output = Path(args.output)
